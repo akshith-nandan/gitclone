@@ -1,4 +1,4 @@
-!#/bin/bash
+#!/bin/bash
 
 ##########
 # About : list of users accessing github
