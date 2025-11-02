@@ -8,7 +8,7 @@
 helper()
 
 #Git API URL
-API_URL="https://api.github.com"
+API_URL="https://github.com"
 
 #Github username and personal access token
 USERNAME=$username
