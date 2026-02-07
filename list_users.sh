@@ -1,56 +1,65 @@
 #!/bin/bash
 
-##########
-# About : list of users accessing GitHub
-# Owner : akshith-nandan
-##########
+# ------------------------------------
+# Project : GitHub Repository Access Audit (With Pagination)
+# ------------------------------------
 
-# Function: Helper to check argument count
-helper() {
-    expected_cmd_args=2
-    if [ $# -ne $expected_cmd_args ]; then
-        echo "Usage: $0 <repo_owner> <repo_name>"
-        exit 1
-    fi
-}
-
-# Git API URL
 API_URL="https://api.github.com"
 
-# GitHub username and personal access token
-USERNAME=$username
-TOKEN=$token
+# GitHub credentials (export as env vars)
+USERNAME=$GITHUB_USERNAME
+TOKEN=$GITHUB_TOKEN
 
-# User and Repository information
+# Validate arguments
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <repo_owner> <repo_name>"
+    exit 1
+fi
+
+# Validate credentials
+if [[ -z "$USERNAME" || -z "$TOKEN" ]]; then
+    echo "Error: Set GITHUB_USERNAME and GITHUB_TOKEN"
+    exit 1
+fi
+
 REPO_OWNER=$1
 REPO_NAME=$2
 
-# Function to make a GET request to the GitHub API
+# GitHub API GET request
 github_api_get() {
-    local endpoint="$1"
-    local url="${API_URL}/${endpoint}"
-
-    # Send a GET request to the GitHub API with authentication
-    curl -s -u "${USERNAME}:${TOKEN}" "$url"
+    local endpoint=$1
+    curl -s -u "$USERNAME:$TOKEN" "$API_URL/$endpoint"
 }
 
-# Function to list users with read access to the repository
-list_users_with_read_access() {
-    local endpoint="repos/${REPO_OWNER}/${REPO_NAME}/collaborators"
+# List users with READ access (pagination supported)
+list_read_users() {
+    local page=1
+    local found=false
 
-    # Fetch the list of collaborators on the repository
-    collaborators="$(github_api_get "$endpoint" | jq -r '.[] | select(.permissions.pull == true) | .login')"
+    echo "Users with READ access:"
 
-    # Display the list of collaborators with read access
-    if [[ -z "$collaborators" ]]; then
-        echo "No users with read access found for ${REPO_OWNER}/${REPO_NAME}."
-    else
-        echo "$collaborators"
+    while true; do
+        endpoint="repos/$REPO_OWNER/$REPO_NAME/collaborators?page=$page&per_page=100"
+
+        response=$(github_api_get "$endpoint")
+
+        users=$(echo "$response" | jq -r \
+            '.[] | select(.permissions.pull == true) | .login')
+
+        # If no users returned → stop pagination
+        if [ -z "$users" ]; then
+            break
+        fi
+
+        echo "$users"
+        found=true
+        ((page++))
+    done
+
+    if [ "$found" = false ]; then
+        echo "No users with read access found."
     fi
 }
 
-# Main Script
-helper "$@"
-
-echo "Listing users with read access to ${REPO_OWNER}/${REPO_NAME}..."
-list_users_with_read_access
+echo "Auditing access for repository: $REPO_OWNER/$REPO_NAME"
+list_read_users
